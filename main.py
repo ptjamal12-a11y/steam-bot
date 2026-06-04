@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
-TOKEN = "PUT_YOUR_TOKEN_HERE"
+TOKEN = "‏8997212415:AAFScTTokC9ugWm3Bu0MDcVW1DJAQaGxmy4"
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
