@@ -3,7 +3,7 @@ from telegram.ext import Application, MessageHandler, ContextTypes, filters
 import requests
 import re
 
-TOKEN = "8997212415:AAFScTTokC9ugWm3Bu0MDcVW1DJAQaGxmy4"
+TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
 
 STEAM_SEARCH = "https://store.steampowered.com/search/?term="
 
