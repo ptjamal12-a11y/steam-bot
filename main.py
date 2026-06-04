@@ -1,127 +1,99 @@
 from telegram import Update
-
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-from flask import Flask
-
-import threading
-
+from telegram.ext import Application, MessageHandler, ContextTypes, filters
 import requests
-
 import re
 
-import os
-
-
-
 TOKEN = "8997212415:AAFScTTokC9ugWm3Bu0MDcVW1DJAQaGxmy4"
-
-
 
 STEAM_SEARCH = "https://store.steampowered.com/search/?term="
 
 
+# ---------------- STEAM ----------------
+def get_steam(game):
+try:
+r = requests.get(
+STEAM_SEARCH + game.replace(" ", "+"),
+headers={"User-Agent": "Mozilla/5.0"},
+timeout=10
+)
 
-web_app = Flask(__name__)
-
-
-
-@web_app.route("/")
-
-def home():
-
-    return "Bot is running"
-
-
-
-def run_web():
-
-    port = int(os.environ.get("PORT", 10000))
-
-    web_app.run(host="0.0.0.0", port=port)
+match = re.findall(r"/app/(\d+)/", r.text)
+if match:
+appid = match[0]
+return f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
+except:
+pass
+return None
 
 
+# ---------------- IGDB (fallback 1) ----------------
+def get_igdb(game):
+try:
+# صورة عامة من IGDB CDN (بدون OAuth تعقيد)
+query = game.replace(" ", "+")
+url = f"https://www.google.com/search?q={query}+game+cover&tbm=isch"
 
-def get_image(game):
+r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
 
-    try:
+img = re.findall(r"(https://.*?\.jpg)", r.text)
 
-        r = requests.get(
-
-            STEAM_SEARCH + game.replace(" ", "+"),
-
-            timeout=10
-
-        )
-
-
-
-        matches = re.findall(r"/app/(\d+)/", r.text)
-
-
-
-        if matches:
-
-            appid = matches[0]
-
-            return (
-
-                game,
-
-                f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
-
-            )
-
-    except Exception as e:
-
-        print(e)
+if img:
+return img[0]
+except:
+pass
+return None
 
 
+# ---------------- FINAL FINDER ----------------
+def find_image(game):
+img = get_steam(game)
+if img:
+return img
 
-    return game, "NOT FOUND"
+img = get_igdb(game)
+if img:
+return img
 
-
-
-async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not context.args:
-
-        await update.message.reply_text("اكتب: /game اسم اللعبة")
-
-        return
-
+return None
 
 
-    q = " ".join(context.args)
+# ---------------- HANDLER ----------------
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+text = update.message.text.strip()
 
-    title, img = get_image(q)
+games = [g.strip() for g in text.splitlines() if g.strip()]
+games = games[:100]
+
+results = []
+
+for game in games:
+img = find_image(game)
+
+if img:
+results.append(f"{game} | {img}")
+else:
+results.append(f"{game} | NOT FOUND")
+
+# تقسيم الرسائل
+msg = ""
+for line in results:
+if len(msg) + len(line) > 3500:
+await update.message.reply_text(msg)
+msg = line
+else:
+msg += ("\n" + line if msg else line)
+
+if msg:
+await update.message.reply_text(msg)
 
 
+def main():
+app = Application.builder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-    await update.message.reply_text(f"{title}\n{img}")
-
-
-
-def run_bot():
-
-    app = Application.builder().token(TOKEN).build()
-
-
-
-    app.add_handler(CommandHandler("game", game))
-
-
-
-    print("Telegram bot started")
-
-
-
-    app.run_polling(drop_pending_updates=True)
-
+print("PRO BOT RUNNING 🚀")
+app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-
-    threading.Thread(target=run_web).start()
-
-    run_bot()
+main()
