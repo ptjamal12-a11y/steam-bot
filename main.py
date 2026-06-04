@@ -43,4 +43,4 @@ async def main():
 
 
 if _name_ == "_main_":
-    asyncio.run(main())
+    app.run_polling()
