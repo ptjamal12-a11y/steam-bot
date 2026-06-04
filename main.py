@@ -75,4 +75,4 @@ async def game(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("game", game))
 
-app.run_polling()
+app.run_polling(drop_pending_updates=True)
