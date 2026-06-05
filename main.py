@@ -85,7 +85,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-    print("BOT RUNNING 🚀  (سكّر النافذة عشان توقفه)")
+    print("BOT RUNNING 🚀 (اضغط Ctrl + C في الشاشة السوداء لإيقافه)")
     app.run_polling(drop_pending_updates=True)
 
 
