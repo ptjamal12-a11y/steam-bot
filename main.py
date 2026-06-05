@@ -2,6 +2,7 @@ import re
 import difflib
 import requests
 import os
+from aiohttp import web
 from telegram import Update
 from telegram.ext import Application, MessageHandler, ContextTypes, filters
 
@@ -9,8 +10,7 @@ TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
 STEAM_SEARCH = "https://store.steampowered.com/search/results/?term={q}&category1=998&cc=us&l=english"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
-# جلب رابط الويب الخاص بك تلقائياً من إعدادات Render
-# إذا لم يكن موجوداً، يرجى استبدال "YOUR_RENDER_URL" برابط موقعك الأزرق من لوحة تحكم Render
+# ⚠️ ضع رابط موقعك الفعلي الأزرق من Render هنا بدلاً من الرابط أدناه إذا كان مختلفاً
 RENDER_EXTERNAL_URL = "https://your-bot-name.onrender.com"
 
 
@@ -81,22 +81,33 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg:
         await update.message.reply_text(msg)
 
+# دالة للاستجابة لرابط الفحص الخاص بـ Render لمنع الإغلاق تلقائياً
+async def html_index(request):
+    return web.Response(text="Bot is alive!", content_type="text/plain")
+
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
     
-    # جلب المنفذ (Port) المخصص من Render تلقائياً
     port = int(os.environ.get("PORT", 8080))
     
-    print(f"Starting Webhook on port {port} 🚀")
-    
-    # تشغيل نظام الـ Webhook المتوافق تماماً مع الـ Web Service في Render
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path=TOKEN,
-        webhook_url=f"{RENDER_EXTERNAL_URL}/{TOKEN}"
-    )
+    # بناء سيرفر ويب متكامل يتعامل مع طلبات تليجرام وطلبات Render الفحصية معاً
+    updater = app.updater
+    if updater:
+        # إعداد منفذ الويب للبوت
+        webhook_app = web.Application()
+        
+        # 1. الرابط الرئيسي: لإرضاء سيرفر Render وجعله أخضر Live دائماً
+        webhook_app.router.add_get("/", html_index)
+        
+        # 2. رابط التوكن المخصص لاستقبال رسائل تليجرام
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=TOKEN,
+            webhook_url=f"{RENDER_EXTERNAL_URL}/{TOKEN}",
+            webhook_app=webhook_app
+        )
 
 if __name__ == "__main__":
     main()
