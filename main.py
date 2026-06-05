@@ -2,10 +2,25 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, ContextTypes, filters
 import requests
 import re
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
 STEAM_SEARCH = "https://store.steampowered.com/search/?term="
 
+# ---- خدعة Render: سيرفر ويب وهمي لجعل المنصة المجانية تعمل ----
+class HealthCheckServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"Bot is Alive!")
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckServer)
+    server.serve_forever()
 
 # ---------------- STEAM ----------------
 def get_steam(game):
@@ -28,7 +43,6 @@ def get_steam(game):
 
     return None
 
-
 # ---------------- GOOGLE FALLBACK ----------------
 def get_google_image(game):
     try:
@@ -50,7 +64,6 @@ def get_google_image(game):
 
     return None
 
-
 # ---------------- FIND IMAGE ----------------
 def find_image(game):
     img = get_steam(game)
@@ -63,7 +76,6 @@ def find_image(game):
 
     return None
 
-
 # ---------------- HANDLER ----------------
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -71,7 +83,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text.strip()
 
-    # دعم 100 لعبة (سطر أو فاصلة)
     games = re.split(r"\n|,", text)
     games = [g.strip() for g in games if g.strip()][:100]
 
@@ -89,7 +100,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             results.append(f"{game} | NOT FOUND")
 
-    # تقسيم الرسائل (Telegram limit)
     msg = ""
 
     for line in results:
@@ -102,16 +112,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg:
         await update.message.reply_text(msg)
 
-
 # ---------------- MAIN ----------------
 def main():
-    app = Application.builder().token(TOKEN).build()
+    # تشغيل سيرفر الويب الوهمي في مسار جانبي لكي يرضى موقع Render
+    threading.Thread(target=run_health_server, daemon=True).start()
 
+    app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
     print("BOT RUNNING 🚀")
     app.run_polling(drop_pending_updates=True)
-
 
 if __name__ == "__main__":
     main()
