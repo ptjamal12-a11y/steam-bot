@@ -10,90 +10,109 @@ STEAM_SEARCH = "https://store.steampowered.com/search/?term="
 
 # ---------------- STEAM ----------------
 def get_steam(game):
-try:
-r = requests.get(
-STEAM_SEARCH + game.replace(" ", "+"),
-headers={"User-Agent": "Mozilla/5.0"},
-timeout=10
-)
+    try:
+        r = requests.get(
+            STEAM_SEARCH + game.replace(" ", "+"),
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
 
-match = re.findall(r"/app/(\d+)/", r.text)
-if match:
-appid = match[0]
-return f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
-except:
-pass
-return None
+        matches = re.findall(r"/app/(\d+)/", r.text)
 
+        if matches:
+            appid = matches[0]
+            img = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
+            return img
 
-# ---------------- IGDB (fallback 1) ----------------
-def get_igdb(game):
-try:
-# صورة عامة من IGDB CDN (بدون OAuth تعقيد)
-query = game.replace(" ", "+")
-url = f"https://www.google.com/search?q={query}+game+cover&tbm=isch"
+    except Exception as e:
+        print("STEAM ERROR:", e)
 
-r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-
-img = re.findall(r"(https://.*?\.jpg)", r.text)
-
-if img:
-return img[0]
-except:
-pass
-return None
+    return None
 
 
-# ---------------- FINAL FINDER ----------------
+# ---------------- GOOGLE FALLBACK ----------------
+def get_google_image(game):
+    try:
+        url = f"https://www.google.com/search?q={game}+game+cover&tbm=isch"
+
+        r = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
+
+        imgs = re.findall(r"(https://.*?\.jpg)", r.text)
+
+        if imgs:
+            return imgs[0]
+
+    except Exception as e:
+        print("GOOGLE ERROR:", e)
+
+    return None
+
+
+# ---------------- FIND IMAGE ----------------
 def find_image(game):
-img = get_steam(game)
-if img:
-return img
+    img = get_steam(game)
+    if img:
+        return img
 
-img = get_igdb(game)
-if img:
-return img
+    img = get_google_image(game)
+    if img:
+        return img
 
-return None
+    return None
 
 
 # ---------------- HANDLER ----------------
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-text = update.message.text.strip()
+    if not update.message or not update.message.text:
+        return
 
-games = [g.strip() for g in text.splitlines() if g.strip()]
-games = games[:100]
+    text = update.message.text.strip()
 
-results = []
+    # دعم 100 لعبة (سطر أو فاصلة)
+    games = re.split(r"\n|,", text)
+    games = [g.strip() for g in games if g.strip()][:100]
 
-for game in games:
-img = find_image(game)
+    if not games:
+        await update.message.reply_text("ارسل أسماء ألعاب")
+        return
 
-if img:
-results.append(f"{game} | {img}")
-else:
-results.append(f"{game} | NOT FOUND")
+    results = []
 
-# تقسيم الرسائل
-msg = ""
-for line in results:
-if len(msg) + len(line) > 3500:
-await update.message.reply_text(msg)
-msg = line
-else:
-msg += ("\n" + line if msg else line)
+    for game in games:
+        img = find_image(game)
 
-if msg:
-await update.message.reply_text(msg)
+        if img:
+            results.append(f"{game} | {img}")
+        else:
+            results.append(f"{game} | NOT FOUND")
+
+    # تقسيم الرسائل (Telegram limit)
+    msg = ""
+
+    for line in results:
+        if len(msg) + len(line) > 3500:
+            await update.message.reply_text(msg)
+            msg = line
+        else:
+            msg += ("\n" + line if msg else line)
+
+    if msg:
+        await update.message.reply_text(msg)
 
 
+# ---------------- MAIN ----------------
 def main():
-app = Application.builder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+    app = Application.builder().token(TOKEN).build()
 
-print("PRO BOT RUNNING 🚀")
-app.run_polling(drop_pending_updates=True)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+
+    print("BOT RUNNING 🚀")
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-main()
+    main()
