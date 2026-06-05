@@ -1,6 +1,7 @@
 import re
 import difflib
 import requests
+import os
 from telegram import Update
 from telegram.ext import Application, MessageHandler, ContextTypes, filters
 
@@ -8,10 +9,12 @@ TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
 STEAM_SEARCH = "https://store.steampowered.com/search/results/?term={q}&category1=998&cc=us&l=english"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
+# جلب رابط الويب الخاص بك تلقائياً من إعدادات Render
+# إذا لم يكن موجوداً، يرجى استبدال "YOUR_RENDER_URL" برابط موقعك الأزرق من لوحة تحكم Render
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "YOUR_RENDER_URL")
 
 def cover_url(appid):
     return f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
-
 
 def image_exists(url):
     try:
@@ -22,16 +25,13 @@ def image_exists(url):
     except Exception:
         return False
 
-
 def norm(s):
     s = re.sub(r"<.*?>", "", s)
     s = re.sub(r"[™®©:\-–—!,.']", " ", s)
     return re.sub(r"\s+", " ", s).strip().lower()
 
-
 def similarity(a, b):
     return difflib.SequenceMatcher(None, norm(a), norm(b)).ratio()
-
 
 def get_steam(game):
     try:
@@ -54,7 +54,6 @@ def get_steam(game):
     except Exception as e:
         print("STEAM ERROR:", e)
         return None, 0.0
-
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -81,13 +80,22 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg:
         await update.message.reply_text(msg)
 
-
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-    print("BOT RUNNING 🚀 (اضغط Ctrl + C في الشاشة السوداء لإيقافه)")
-    app.run_polling(drop_pending_updates=True)
-
+    
+    # جلب المنفذ (Port) المخصص من Render تلقائياً
+    port = int(os.environ.get("PORT", 8080))
+    
+    print(f"Starting Webhook on port {port} 🚀")
+    
+    # تشغيل نظام الـ Webhook المتوافق تماماً مع الـ Web Service في Render
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=TOKEN,
+        webhook_url=f"{RENDER_EXTERNAL_URL}/{TOKEN}"
+    )
 
 if __name__ == "__main__":
     main()
