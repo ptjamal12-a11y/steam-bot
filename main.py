@@ -3,11 +3,14 @@ from telegram.ext import Application, MessageHandler, ContextTypes, filters
 import requests
 import re
 import os
+import difflib
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1UHR07jDB_WSjujHU"
-STEAM_SEARCH = "https://store.steampowered.com/search/?term="
+TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
+
+# بحث Steam — category1=998 يعني "ألعاب فقط" (يستبعد DLC والموسيقى والفيديو والحزم)
+STEAM_SEARCH = "https://store.steampowered.com/search/results/?term={q}&category1=998&cc=us&l=english"
 
 # ---- خدعة Render: سيرفر ويب وهمي لجعل المنصة المجانية تعمل ----
 class HealthCheckServer(BaseHTTPRequestHandler):
@@ -16,110 +19,108 @@ class HealthCheckServer(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
         self.wfile.write(b"Bot is Alive!")
+    def log_message(self, *args):
+        pass  # كتم سجلات السيرفر الوهمي
 
 def run_health_server():
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), HealthCheckServer)
-    server.serve_forever()
+    HTTPServer(("0.0.0.0", port), HealthCheckServer).serve_forever()
 
-# ---------------- STEAM ----------------
+# ---------------- أدوات مساعدة ----------------
+def cover_url(appid):
+    # هوست akamai أوثق من cloudflare للغلاف العمودي 600x900
+    return f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
+
+def image_exists(url):
+    """يرجّع True فقط لو الصورة موجودة فعلاً (HTTP 200) — يمنع الروابط الميتة."""
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"},
+                         timeout=8, stream=True)
+        ok = (r.status_code == 200 and
+              "image" in r.headers.get("Content-Type", ""))
+        r.close()
+        return ok
+    except Exception:
+        return False
+
+def clean(s):
+    s = re.sub(r"<.*?>", "", s)              # شيل أي HTML
+    s = re.sub(r"[™®©:\-–—!]", " ", s)        # شيل رموز وعلامات
+    s = re.sub(r"\s+", " ", s)
+    return s.strip().lower()
+
+def similarity(a, b):
+    return difflib.SequenceMatcher(None, clean(a), clean(b)).ratio()
+
+# ---------------- البحث في Steam ----------------
 def get_steam(game):
     try:
         r = requests.get(
-            STEAM_SEARCH + game.replace(" ", "+"),
+            STEAM_SEARCH.format(q=requests.utils.quote(game)),
             headers={"User-Agent": "Mozilla/5.0"},
-            timeout=10
+            timeout=12,
         )
-        
-        matches = re.findall(r"/app/(\d+)/", r.text)
-        
-        if matches:
-            appid = matches[0]
-            img = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
-            return img
-            
+        # كل نتيجة فيها رقم اللعبة + عنوانها — نسحبهم سوا عشان نطابق بالاسم
+        rows = re.findall(
+            r'data-ds-appid="(\d+)"[^>]*>.*?<span class="title">(.*?)</span>',
+            r.text, re.S
+        )
+        if not rows:
+            return None, None, 0.0
+
+        # رتّب المرشحين حسب قرب الاسم من اللي طلبته (الأعلى تطابقاً أولاً)
+        ranked = sorted(rows, key=lambda x: similarity(game, x[1]), reverse=True)
+
+        # امشِ على أفضل 6 مطابقات، ورجّع أول وحدة صورتها موجودة فعلاً
+        for appid, title in ranked[:6]:
+            score = similarity(game, title)
+            if score < 0.45:        # تطابق ضعيف جداً = لا تخمّن
+                break
+            url = cover_url(appid)
+            if image_exists(url):
+                return url, clean(title), score
+        return None, None, 0.0
     except Exception as e:
         print("STEAM ERROR:", e)
+        return None, None, 0.0
 
-    return None
-
-# ---------------- GOOGLE FALLBACK ----------------
-def get_google_image(game):
-    try:
-        url = f"https://www.google.com/search?q={game}+game+cover&tbm=isch"
-
-        r = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=10
-        )
-
-        imgs = re.findall(r"(https://.*?\.jpg)", r.text)
-
-        if imgs:
-            return imgs[0]
-
-    except Exception as e:
-        print("GOOGLE ERROR:", e)
-
-    return None
-
-# ---------------- FIND IMAGE ----------------
-def find_image(game):
-    img = get_steam(game)
-    if img:
-        return img
-
-    img = get_google_image(game)
-    if img:
-        return img
-
-    return None
-
-# ---------------- HANDLER ----------------
+# ---------------- معالج الرسائل ----------------
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
-
-    games = re.split(r"\n|,", text)
-    games = [g.strip() for g in games if g.strip()][:100]
+    games = [g.strip() for g in re.split(r"\n|,", text) if g.strip()][:100]
 
     if not games:
-        await update.message.reply_text("ارسل أسماء ألعاب")
+        await update.message.reply_text("ارسل أسماء ألعاب (اسم في كل سطر)")
         return
 
     results = []
-
     for game in games:
-        img = find_image(game)
-
-        if img:
-            results.append(f"{game} | {img}")
+        url, matched, score = get_steam(game)
+        if url:
+            flag = "  ⚠️تأكد" if score < 0.7 else ""   # تطابق متوسط = راجعه بعينك
+            results.append(f"{game} | {url}{flag}")
         else:
             results.append(f"{game} | NOT FOUND")
 
+    # أرسل النتائج على دفعات عشان حد طول رسالة تيليجرام
     msg = ""
-
     for line in results:
         if len(msg) + len(line) > 3500:
             await update.message.reply_text(msg)
             msg = line
         else:
             msg += ("\n" + line if msg else line)
-
     if msg:
         await update.message.reply_text(msg)
 
-# ---------------- MAIN ----------------
+# ---------------- التشغيل ----------------
 def main():
-    # تشغيل سيرفر الويب الوهمي في مسار جانبي لكي يرضى موقع Render
     threading.Thread(target=run_health_server, daemon=True).start()
-
     app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-
     print("BOT RUNNING 🚀")
     app.run_polling(drop_pending_updates=True)
 
