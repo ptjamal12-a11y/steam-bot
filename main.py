@@ -9,7 +9,7 @@ from telegram.ext import Application, MessageHandler, ContextTypes, filters
 TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
 STEAM_SEARCH = "https://store.steampowered.com/search/results/?term={q}&category1=998&cc=us&l=english"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
+gameback.com
 # ⚠️ ضع رابط موقعك الفعلي الأزرق من Render هنا بدلاً من الرابط أدناه إذا كان مختلفاً
 RENDER_EXTERNAL_URL = "https://your-bot-name.onrender.com"
 
