@@ -10,7 +10,7 @@ STEAM_SEARCH = "https://store.steampowered.com/search/?term="
 
 # ---------------- STEAM ----------------
 def get_steam(game):
-    try:
+        try:
         r = requests.get(
             STEAM_SEARCH + game.replace(" ", "+"),
             headers={"User-Agent": "Mozilla/5.0"},
