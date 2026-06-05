@@ -37,7 +37,6 @@ def get_steam(game):
     try:
         r = requests.get(STEAM_SEARCH.format(q=requests.utils.quote(game)),
                          headers=HEADERS, timeout=12)
-        # هذا التعبير النمطي يبحث عن appid وعنوان اللعبة من كود HTML الخاص بستيم
         rows = re.findall(
             r'data-ds-appid="(\d+)"[^>]*>.*?<span class="title">(.*?)</span>',
             r.text, re.S)
