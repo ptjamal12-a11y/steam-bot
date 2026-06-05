@@ -11,7 +11,8 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 
 # جلب رابط الويب الخاص بك تلقائياً من إعدادات Render
 # إذا لم يكن موجوداً، يرجى استبدال "YOUR_RENDER_URL" برابط موقعك الأزرق من لوحة تحكم Render
-RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "YOUR_RENDER_URL")
+RENDER_EXTERNAL_URL = "https://your-bot-name.onrender.com"
+
 
 def cover_url(appid):
     return f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"
