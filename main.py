@@ -4,26 +4,25 @@ import requests
 import re
 
 TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
-
 STEAM_SEARCH = "https://store.steampowered.com/search/?term="
 
 
 # ---------------- STEAM ----------------
 def get_steam(game):
-        try:
+    try:
         r = requests.get(
             STEAM_SEARCH + game.replace(" ", "+"),
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10
         )
-
+        
         matches = re.findall(r"/app/(\d+)/", r.text)
-
+        
         if matches:
             appid = matches[0]
             img = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg"
             return img
-
+            
     except Exception as e:
         print("STEAM ERROR:", e)
 
