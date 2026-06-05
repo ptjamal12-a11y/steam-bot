@@ -6,7 +6,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-TOKEN = “8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU”
+TOKEN = "8997212415:AAFd-Kdg_R1N6QDgPD1HR07jDB_WSjujHU"
 STEAM_SEARCH = “https://store.steampowered.com/search/?term=”
 
 –– خدعة Render: سيرفر ويب وهمي لجعل المنصة المجانية تعمل ––
